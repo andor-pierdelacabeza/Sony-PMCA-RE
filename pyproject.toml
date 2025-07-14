@@ -18,3 +18,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "tlslite-ng>=0.8.2",
 ]
+
+[tool.black]
+line-length = 120
+target-version = ['py313']
