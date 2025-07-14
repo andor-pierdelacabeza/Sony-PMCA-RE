@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """A command line application to install apps on Android-enabled Sony cameras"""
 import argparse
+import sys
 
-from pmca.commands.backup import *
-from pmca.commands.market import *
-from pmca.commands.usb import *
+# Expanded 'from pmca.commands.backup import *' and removed unused functions
+# from pmca.commands.backup import printHexDump, printBackupCommand
+from pmca.commands.backup import printBackupCommand
+from pmca.commands.market import marketCommand
+# Expanded 'from pmca.commands.usb import *' and removed unused functions
+# from pmca.commands.usb import printStatus, listApps, installApp, checkApk, importDriver, listDevices,
+# getDevice, infoCommand, installCommand, appSelectionCommand, getFdats, getFdat, firmwareUpdateCommand, updaterShellCommand, firmwareUpdateCommandInternal, guessFirmwareCommand, gpsUpdateCommand, streamingCommand, wifiCommand, senserShellCommand
+from pmca.commands.usb import (infoCommand, installCommand, appSelectionCommand, firmwareUpdateCommand,
+                               updaterShellCommand, guessFirmwareCommand, gpsUpdateCommand, streamingCommand,
+                               wifiCommand, senserShellCommand)
 from pmca import spk
 
 if getattr(sys, 'frozen', False):

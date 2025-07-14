@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 """A simple gui interface"""
 import sys
+import threading
 import traceback
 import webbrowser
+import tkinter as tk
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename
 
 import config
-from pmca.commands.usb import *
-from pmca.platform.backend.senser import *
-from pmca.platform.backend.usb import *
-from pmca.platform.tweaks import *
-from pmca.ui import *
+# Expanded 'from pmca.commands.usb import *' and removed unused functions
+# from pmca.commands.usb import printStatus, listApps, installApp, checkApk, importDriver, listDevices, listDevices,
+# getDevice, infoCommand, installCommand, appSelectionCommand, getFdats, getFdat, firmwareUpdateCommand, updaterShellCommand, firmwareUpdateCommandInternal, guessFirmwareCommand, gpsUpdateCommand, streamingCommand, wifiCommand, senserShellCommand
+from pmca.commands.usb import listApps, installCommand, infoCommand, firmwareUpdateCommand, updaterShellCommand, senserShellCommand
+
+from pmca.platform.backend.senser import SenserPlatformBackend
+# Expanded 'from pmca.platform.backend.usb import *' but unused
+# from pmca.platform.backend.usb import usb_transfer_socket, usb_transfer_read, usb_transfer_write
+from pmca.platform.backend.usb import UsbPlatformBackend
+from pmca.platform.tweaks import TweakInterface
+from pmca.ui import BackgroundTask, UiRoot, UiFrame, UiDialog, ScrollingText
 
 if getattr(sys, 'frozen', False):
  from frozenversion import version
@@ -32,7 +42,7 @@ class PrintRedirector(object):
 class AppLoadTask(BackgroundTask):
  def doBefore(self):
   self.ui.setAppList([])
-  self.ui.appLoadButton.config(state=DISABLED)
+  self.ui.appLoadButton.config(state=tk.DISABLED)
 
  def do(self, arg):
   try:
@@ -44,13 +54,13 @@ class AppLoadTask(BackgroundTask):
  def doAfter(self, result):
   if result:
    self.ui.setAppList(result)
-  self.ui.appLoadButton.config(state=NORMAL)
+  self.ui.appLoadButton.config(state=tk.NORMAL)
 
 
 class InfoTask(BackgroundTask):
  """Task to run infoCommand()"""
  def doBefore(self):
-  self.ui.infoButton.config(state=DISABLED)
+  self.ui.infoButton.config(state=tk.DISABLED)
 
  def do(self, arg):
   try:
@@ -60,13 +70,13 @@ class InfoTask(BackgroundTask):
    traceback.print_exc()
 
  def doAfter(self, result):
-  self.ui.infoButton.config(state=NORMAL)
+  self.ui.infoButton.config(state=tk.NORMAL)
 
 
 class InstallTask(BackgroundTask):
  """Task to run installCommand()"""
  def doBefore(self):
-  self.ui.installButton.config(state=DISABLED)
+  self.ui.installButton.config(state=tk.DISABLED)
   return self.ui.getMode(), self.ui.getSelectedApk(), self.ui.getSelectedApp()
 
  def do(self, args):
@@ -84,13 +94,13 @@ class InstallTask(BackgroundTask):
    traceback.print_exc()
 
  def doAfter(self, result):
-  self.ui.installButton.config(state=NORMAL)
+  self.ui.installButton.config(state=tk.NORMAL)
 
 
 class FirmwareUpdateTask(BackgroundTask):
  """Task to run firmwareUpdateCommand()"""
  def doBefore(self):
-  self.ui.fwUpdateButton.config(state=DISABLED)
+  self.ui.fwUpdateButton.config(state=tk.DISABLED)
   return self.ui.getSelectedDat()
 
  def do(self, datFile):
@@ -103,13 +113,13 @@ class FirmwareUpdateTask(BackgroundTask):
    traceback.print_exc()
 
  def doAfter(self, result):
-  self.ui.fwUpdateButton.config(state=NORMAL)
+  self.ui.fwUpdateButton.config(state=tk.NORMAL)
 
 
 class StartPlatformShellTask(BackgroundTask):
  def doBefore(self):
-  self.ui.startUpdaterShellButton.config(state=DISABLED)
-  self.ui.startSenserShellButton.config(state=DISABLED)
+  self.ui.startUpdaterShellButton.config(state=tk.DISABLED)
+  self.ui.startSenserShellButton.config(state=tk.DISABLED)
 
  def do(self, arg):
   try:
@@ -136,8 +146,8 @@ class StartPlatformShellTask(BackgroundTask):
   backend.stop()
 
  def doAfter(self, result):
-  self.ui.startUpdaterShellButton.config(state=NORMAL)
-  self.ui.startSenserShellButton.config(state=NORMAL)
+  self.ui.startUpdaterShellButton.config(state=tk.NORMAL)
+  self.ui.startSenserShellButton.config(state=tk.NORMAL)
 
 
 class StartUpdaterShellTask(StartPlatformShellTask):
@@ -155,7 +165,7 @@ class StartSenserShellTask(StartPlatformShellTask):
 class TweakApplyTask(BackgroundTask):
  """Task to run TweakInterface.apply()"""
  def doBefore(self):
-  self.ui.setState(DISABLED)
+  self.ui.setState(tk.DISABLED)
 
  def do(self, arg):
   try:
@@ -165,7 +175,7 @@ class TweakApplyTask(BackgroundTask):
    traceback.print_exc()
 
  def doAfter(self, result):
-  self.ui.setState(NORMAL)
+  self.ui.setState(tk.NORMAL)
   self.ui.cancel()
 
 
@@ -176,31 +186,31 @@ class MainUi(UiRoot):
 
   self.title(title)
   self.geometry('450x500')
-  self['menu'] = Menu(self)
+  self['menu'] = tk.Menu(self)
 
-  tabs = Notebook(self, padding=5)
-  tabs.pack(fill=X)
+  tabs = ttk.Notebook(self, padding=5)
+  tabs.pack(fill="x")
 
   tabs.add(InfoFrame(self, padding=10), text='Camera info')
   tabs.add(InstallerFrame(self, padding=10), text='Install app')
   tabs.add(UpdaterShellFrame(self, padding=10), text='Tweaks')
   tabs.add(FirmwareFrame(self, padding=10), text='Update firmware')
 
-  docsLink = Label(self, text='Camera compatibility', foreground='blue', cursor='hand2')
+  docsLink = ttk.Label(self, text='Camera compatibility', foreground='blue', cursor='hand2')
   docsLink.bind('<Button-1>', lambda e: webbrowser.open_new(config.docsUrl + '/devices.html'))
   docsLink.pack(pady=(0, 5))
 
   self.logText = ScrollingText(self)
-  self.logText.text.configure(state=DISABLED)
-  self.logText.pack(fill=BOTH, expand=True)
+  self.logText.text.configure(state=tk.DISABLED)
+  self.logText.pack(fill="both", expand=True)
 
   self.redirectStreams()
 
  def log(self, msg):
-  self.logText.text.configure(state=NORMAL)
-  self.logText.text.insert(END, msg)
-  self.logText.text.configure(state=DISABLED)
-  self.logText.text.see(END)
+  self.logText.text.configure(state=tk.NORMAL)
+  self.logText.text.insert(tk.END, msg)
+  self.logText.text.configure(state=tk.DISABLED)
+  self.logText.text.see(tk.END)
 
  def redirectStreams(self):
   for stream in ['stdout', 'stderr']:
@@ -211,8 +221,8 @@ class InfoFrame(UiFrame):
  def __init__(self, parent, **kwargs):
   UiFrame.__init__(self, parent, **kwargs)
 
-  self.infoButton = Button(self, text='Get camera info', command=InfoTask(self).run, padding=5)
-  self.infoButton.pack(fill=X)
+  self.infoButton = ttk.Button(self, text='Get camera info', command=InfoTask(self).run, padding=5)
+  self.infoButton.pack(fill="x")
 
 
 class InstallerFrame(UiFrame):
@@ -222,38 +232,38 @@ class InstallerFrame(UiFrame):
  def __init__(self, parent, **kwargs):
   UiFrame.__init__(self, parent, **kwargs)
 
-  self.modeVar = IntVar(value=self.MODE_APP)
+  self.modeVar = tk.IntVar(value=self.MODE_APP)
 
-  appFrame = Labelframe(self, padding=5)
-  appFrame['labelwidget'] = Radiobutton(appFrame, text='Select an app from the app list', variable=self.modeVar, value=self.MODE_APP)
+  appFrame = ttk.Labelframe(self, padding=5)
+  appFrame['labelwidget'] = ttk.Radiobutton(appFrame, text='Select an app from the app list', variable=self.modeVar, value=self.MODE_APP)
   appFrame.columnconfigure(0, weight=1)
-  appFrame.pack(fill=X)
+  appFrame.pack(fill="x")
 
-  self.appCombo = Combobox(appFrame, state='readonly')
+  self.appCombo = ttk.Combobox(appFrame, state='readonly')
   self.appCombo.bind('<<ComboboxSelected>>', lambda e: self.modeVar.set(self.MODE_APP))
-  self.appCombo.grid(row=0, column=0, sticky=W+E)
+  self.appCombo.grid(row=0, column=0, sticky=tk.W+tk.E)
   self.setAppList([])
 
-  self.appLoadButton = Button(appFrame, text='Refresh', command=AppLoadTask(self).run)
+  self.appLoadButton = ttk.Button(appFrame, text='Refresh', command=AppLoadTask(self).run)
   self.appLoadButton.grid(row=0, column=1)
 
-  appListLink = Label(appFrame, text='Source', foreground='blue', cursor='hand2')
+  appListLink = ttk.Label(appFrame, text='Source', foreground='blue', cursor='hand2')
   appListLink.bind('<Button-1>', lambda e: webbrowser.open_new('https://github.com/' + config.githubAppListUser + '/' + config.githubAppListRepo))
-  appListLink.grid(columnspan=2, sticky=W)
+  appListLink.grid(columnspan=2, sticky=tk.W)
 
-  apkFrame = Labelframe(self, padding=5)
-  apkFrame['labelwidget'] = Radiobutton(apkFrame, text='Select an apk', variable=self.modeVar, value=self.MODE_APK)
+  apkFrame = ttk.Labelframe(self, padding=5)
+  apkFrame['labelwidget'] = ttk.Radiobutton(apkFrame, text='Select an apk', variable=self.modeVar, value=self.MODE_APK)
   apkFrame.columnconfigure(0, weight=1)
-  apkFrame.pack(fill=X)
+  apkFrame.pack(fill="x")
 
-  self.apkFile = Entry(apkFrame)
-  self.apkFile.grid(row=0, column=0, sticky=W+E)
+  self.apkFile = ttk.Entry(apkFrame)
+  self.apkFile.grid(row=0, column=0, sticky=tk.W+tk.E)
 
-  self.apkSelectButton = Button(apkFrame, text='Open apk...', command=self.openApk)
+  self.apkSelectButton = ttk.Button(apkFrame, text='Open apk...', command=self.openApk)
   self.apkSelectButton.grid(row=0, column=1)
 
-  self.installButton = Button(self, text='Install selected app', command=InstallTask(self).run, padding=5)
-  self.installButton.pack(fill=X, pady=(5, 0))
+  self.installButton = ttk.Button(self, text='Install selected app', command=InstallTask(self).run, padding=5)
+  self.installButton.pack(fill="x", pady=(5, 0))
 
   self.run(AppLoadTask(self).run)
 
@@ -263,7 +273,7 @@ class InstallerFrame(UiFrame):
  def openApk(self):
   fn = askopenfilename(filetypes=[('Apk files', '.apk'), ('All files', '.*')])
   if fn:
-   self.apkFile.delete(0, END)
+   self.apkFile.delete(0, tk.END)
    self.apkFile.insert(0, fn)
    self.modeVar.set(self.MODE_APK)
 
@@ -284,23 +294,23 @@ class FirmwareFrame(UiFrame):
  def __init__(self, parent, **kwargs):
   UiFrame.__init__(self, parent, **kwargs)
 
-  datFrame = Labelframe(self, padding=5)
-  datFrame['labelwidget'] = Label(datFrame, text='Firmware file')
-  datFrame.pack(fill=X)
+  datFrame = ttk.Labelframe(self, padding=5)
+  datFrame['labelwidget'] = ttk.Label(datFrame, text='Firmware file')
+  datFrame.pack(fill="x")
 
-  self.datFile = Entry(datFrame)
-  self.datFile.pack(side=LEFT, fill=X, expand=True)
+  self.datFile = tk.Entry(datFrame)
+  self.datFile.pack(side=tk.LEFT, fill="x", expand=True)
 
-  self.datSelectButton = Button(datFrame, text='Open...', command=self.openDat)
+  self.datSelectButton = ttk.Button(datFrame, text='Open...', command=self.openDat)
   self.datSelectButton.pack()
 
-  self.fwUpdateButton = Button(self, text='Update firmware', command=FirmwareUpdateTask(self).run, padding=5)
-  self.fwUpdateButton.pack(fill=X, pady=(5, 0))
+  self.fwUpdateButton = ttk.Button(self, text='Update firmware', command=FirmwareUpdateTask(self).run, padding=5)
+  self.fwUpdateButton.pack(fill="x", pady=(5, 0))
 
  def openDat(self):
   fn = askopenfilename(filetypes=[('Firmware files', '.dat'), ('All files', '.*')])
   if fn:
-   self.datFile.delete(0, END)
+   self.datFile.delete(0, tk.END)
    self.datFile.insert(0, fn)
 
  def getSelectedDat(self):
@@ -311,11 +321,11 @@ class UpdaterShellFrame(UiFrame):
  def __init__(self, parent, **kwargs):
   UiFrame.__init__(self, parent, **kwargs)
 
-  self.startUpdaterShellButton = Button(self, text='Start tweaking (updater mode)', command=StartUpdaterShellTask(self).run, padding=5)
-  self.startUpdaterShellButton.pack(fill=X)
+  self.startUpdaterShellButton = ttk.Button(self, text='Start tweaking (updater mode)', command=StartUpdaterShellTask(self).run, padding=5)
+  self.startUpdaterShellButton.pack(fill="x")
 
-  self.startSenserShellButton = Button(self, text='Start tweaking (service mode)', command=StartSenserShellTask(self).run, padding=5)
-  self.startSenserShellButton.pack(fill=X, pady=(5, 0))
+  self.startSenserShellButton = ttk.Button(self, text='Start tweaking (service mode)', command=StartSenserShellTask(self).run, padding=5)
+  self.startSenserShellButton.pack(fill="x", pady=(5, 0))
 
 
 class TweakDialog(UiDialog):
@@ -325,15 +335,15 @@ class TweakDialog(UiDialog):
   UiDialog.__init__(self, parent, "Tweaks")
 
  def body(self, top):
-  tweakFrame = Labelframe(top, padding=5)
-  tweakFrame['labelwidget'] = Label(tweakFrame, text='Tweaks')
-  tweakFrame.pack(fill=X)
+  tweakFrame = ttk.Labelframe(top, padding=5)
+  tweakFrame['labelwidget'] = ttk.Label(tweakFrame, text='Tweaks')
+  tweakFrame.pack(fill="x")
 
-  self.boxFrame = Frame(tweakFrame)
-  self.boxFrame.pack(fill=BOTH, expand=True)
+  self.boxFrame = ttk.Frame(tweakFrame)
+  self.boxFrame.pack(fill="both", expand=True)
 
-  self.applyButton = Button(top, text='Apply', command=TweakApplyTask(self).run, padding=5)
-  self.applyButton.pack(fill=X)
+  self.applyButton = ttk.Button(top, text='Apply', command=TweakApplyTask(self).run, padding=5)
+  self.applyButton.pack(fill="x")
 
   self.updateStatus()
 
@@ -341,9 +351,9 @@ class TweakDialog(UiDialog):
   for child in self.boxFrame.winfo_children():
    child.destroy()
   for id, desc, status, value in self.tweakInterface.getTweaks():
-   var = IntVar(value=status)
-   c = Checkbutton(self.boxFrame, text=desc + '\n' + value, variable=var, command=lambda id=id, var=var: self.setTweak(id, var.get()))
-   c.pack(fill=X)
+   var = tk.IntVar(value=status)
+   c = tk.Checkbutton(self.boxFrame, text=desc + '\n' + value, variable=var, command=lambda id=id, var=var: self.setTweak(id, var.get()))
+   c.pack(fill="x")
 
  def setTweak(self, id, enabled):
   self.tweakInterface.setEnabled(id, enabled)

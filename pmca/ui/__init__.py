@@ -2,14 +2,15 @@
 
 import threading
 from queue import Queue, Empty
-from tkinter import *
-from tkinter.ttk import *
-from tkinter.filedialog import askopenfilename
+import tkinter as tk
+from tkinter import ttk
+# unused
+# from tkinter.filedialog import askopenfilename
 from tkinter.simpledialog import Dialog
 
-class UiRoot(Tk):
+class UiRoot(tk.Tk):
  def __init__(self):
-  Tk.__init__(self)
+  tk.Tk.__init__(self)
   self._queue = Queue()
   self._processQueue()
 
@@ -26,7 +27,7 @@ class UiRoot(Tk):
   self.after(100, self._processQueue)
 
 
-class UiFrame(Frame):
+class UiFrame(ttk.Frame):
  def run(self, func):
   self.master.run(func)
 
@@ -64,14 +65,14 @@ class BackgroundTask(object):
   self.ui.run(lambda: self.doAfter(result))
 
 
-class ScrollingText(Frame):
+class ScrollingText(ttk.Frame):
  """A wrapper for a Text widget with a scrollbar"""
  def __init__(self, parent):
-  Frame.__init__(self, parent)
-  Grid.columnconfigure(self, 0, weight=1)
-  Grid.rowconfigure(self, 0, weight=1)
-  self.scrollbar = Scrollbar(self)
-  self.scrollbar.grid(row=0, column=1, sticky=N+S)
-  self.text = Text(self, wrap=WORD, yscrollcommand=self.scrollbar.set)
-  self.text.grid(row=0, column=0, sticky=N+S+W+E)
+  ttk.Frame.__init__(self, parent)
+  tk.Grid.columnconfigure(self, 0, weight=1)
+  tk.Grid.rowconfigure(self, 0, weight=1)
+  self.scrollbar = ttk.Scrollbar(self)
+  self.scrollbar.grid(row=0, column=1, sticky=tk.N+tk.S)
+  self.text = tk.Text(self, wrap="word", yscrollcommand=self.scrollbar.set)
+  self.text.grid(row=0, column=0, sticky=tk.N+tk.S+tk.W+tk.E)
   self.scrollbar.config(command=self.text.yview)
